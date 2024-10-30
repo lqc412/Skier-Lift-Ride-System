@@ -24,7 +24,7 @@ This project simulates a skier lift ride system using a distributed architecture
     1. Compile and run `SkClient2`.
     2. It uses a `CachedThreadPool` to manage threads for optimal throughput.
 
-### 3. Consumer - in `ServerAndConsumer`
+### 3. Consumer - in `Server2`
 - **Technology**: Java, RabbitMQ
 - **Description**: The RabbitMQ consumer (`MultiThreadConsumer`) listens to the queue for incoming lift ride messages and processes them.
 - **Main Features**:
