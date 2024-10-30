@@ -1,60 +1,79 @@
-import com.rabbitmq.client.*;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.DeliverCallback;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeoutException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class MultiThreadConsumer {
+    private final static String QUEUE_NAME = "SkierServletPostQueue";
+    private final static Integer NUM_THREADS = 10; //512;
 
-    private final static String QUEUE_NAME = "liftRideQueue";
-    private final static int NUM_THREADS = 20; // 设置消费者线程数量
+    public static void main(String[] args) throws Exception {
+        Gson gson = new Gson();
+        ConnectionFactory factory = new ConnectionFactory();
+        ConcurrentHashMap<Integer, List<JsonObject>> map = new ConcurrentHashMap<>();
 
-    public static void main(String[] argv) throws Exception {
-        // 创建线程池
-        ExecutorService executorService = Executors.newFixedThreadPool(NUM_THREADS);
+        factory.setHost("localhost");
+//        factory.setHost("35.90.118.182");
+        factory.setPort(5672);
+        factory.setUsername("guest");
+        factory.setPassword("guest");
+        System.out.println("try to connect");
+        Connection connection = factory.newConnection();
+        System.out.println("connection successful");
 
-        // 为每个线程创建一个消费者任务
-        for (int i = 0; i < NUM_THREADS; i++) {
-            executorService.execute(new ConsumerTask());
-        }
+        Runnable runnable = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    final Channel channel = connection.createChannel();
+                    channel.queueDeclare(QUEUE_NAME, false, false, false, null);
+                    // 每个consumer最多一个把
+                    channel.basicQos(30);
 
-        // 关闭线程池（可选）
-        executorService.shutdown();
-    }
-
-    static class ConsumerTask implements Runnable {
-
-        @Override
-        public void run() {
-            ConnectionFactory factory = new ConnectionFactory();
-            factory.setHost("localhost"); // 本地连接
-            factory.setPort(5672);
-            factory.setUsername("guest");
-            factory.setPassword("guest");
-
-            try {
-                // 每个线程都有独立的连接和通道
-                Connection connection = factory.newConnection();
-                Channel channel = connection.createChannel();
-
-                // 声明队列（确保队列存在）
-                channel.queueDeclare(QUEUE_NAME, false, false, false, null);
-                System.out.println(" [*] Waiting for messages. To exit press CTRL+C");
-
-                // 创建消费者，接收消息
-                DeliverCallback deliverCallback = (consumerTag, delivery) -> {
-                    String message = new String(delivery.getBody(), "UTF-8");
-                    System.out.println(" [x] Received '" + message + "' by Thread: " + Thread.currentThread().getName());
-                    // 在此处可以对消息进行处理，例如将数据写入数据库
-                };
-
-                // 开始消费
-                channel.basicConsume(QUEUE_NAME, true, deliverCallback, consumerTag -> {});
-
-            } catch (IOException | TimeoutException e) {
-                e.printStackTrace();
+                    DeliverCallback deliverCallback = (consumerTag, delivery) -> {
+//            System.out.println("1");
+                        String message = new String(delivery.getBody(), "UTF-8");
+                        JsonObject jsonObject = gson.fromJson(message, JsonObject.class);
+//            System.out.println(jsonObject.toString());
+                        Integer key = Integer.valueOf(String.valueOf(jsonObject.get("skierID")));
+                        if (map.contains(key)) {
+                            map.get(key).add(jsonObject);
+                        } else {
+                            List<JsonObject> value = new ArrayList<>();
+                            value.add(jsonObject);
+                            map.put(key, value);
+                        }
+                        channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);  // 学习要点1
+                    };
+                    channel.basicConsume(QUEUE_NAME, false, deliverCallback, consumerTag -> {
+                    });
+                } catch (IOException e) {
+                    Logger.getLogger(MultiThreadConsumer.class.getName()).log(Level.SEVERE, null, e); //学习要点2
+                }
             }
+        };
+
+        // Begin to start our threads.
+        ExecutorService pool = Executors.newFixedThreadPool(NUM_THREADS);
+        for (int i = 0; i < NUM_THREADS; i++) {
+            pool.execute(runnable);
         }
+
+//    for (int i=0; i<NUM_THREADS; i++){
+//      Thread cons = new Thread(runnable);
+//      cons.start();
+//    }
+
     }
 }

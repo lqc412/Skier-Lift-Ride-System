@@ -14,7 +14,7 @@ import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class LiftRideConsumer {
+public class Consumer {
     private final static String QUEUE_NAME = "SkierServletPostQueue";
     private final static Integer NUM_THREADS = 10; //512;
 
@@ -23,13 +23,10 @@ public class LiftRideConsumer {
         ConnectionFactory factory = new ConnectionFactory();
         ConcurrentHashMap<Integer, List<JsonObject>> map = new ConcurrentHashMap<>();
 
-//    factory.setHost("localhost");
-        factory.setHost("35.90.118.182");
+        factory.setHost("localhost");
         factory.setPort(5672);
-        factory.setUsername("mario");
-        factory.setPassword("mariobar");
-//    factory.setUsername("guest");
-//    factory.setPassword("guest");
+        factory.setUsername("guest");
+        factory.setPassword("guest");
         System.out.println("try to connect");
         Connection connection = factory.newConnection();
         System.out.println("connection successful");
@@ -61,7 +58,7 @@ public class LiftRideConsumer {
                     channel.basicConsume(QUEUE_NAME, false, deliverCallback, consumerTag -> {
                     });
                 } catch (IOException e) {
-                    Logger.getLogger(LiftRideConsumer.class.getName()).log(Level.SEVERE, null, e); //学习要点2
+                    Logger.getLogger(Consumer.class.getName()).log(Level.SEVERE, null, e); //学习要点2
                 }
             }
         };
