@@ -56,7 +56,7 @@ public class SkierServlet extends HttpServlet {
                 res.getWriter().write(gson.toJson(skierVertical));
                 logger.info("Responded with SkierVertical data for URL: " + urlPath);
             } else {
-                res.getWriter().write("it works");
+                res.getWriter().write("it works001");
                 logger.info("GET request successful for URL: " + urlPath);
             }
         }
@@ -93,12 +93,19 @@ public class SkierServlet extends HttpServlet {
                 logger.info("POST request body: " + sb.toString());
                 LiftRide liftRide = gson.fromJson(sb.toString(), LiftRide.class);
                 logger.info("Parsed LiftRide data: " + liftRide.toString());
+
+                int resortID = Integer.parseInt(urlParts[1]);
+                String seasonID = urlParts[3];
+                String dayID = urlParts[5];
                 int skierID = Integer.parseInt(urlParts[7]);
 
                 JsonObject liftInfo = new JsonObject();
                 liftInfo.addProperty("time", liftRide.getTime());
                 liftInfo.addProperty("liftID", liftRide.getLiftID());
                 liftInfo.addProperty("skierID", skierID);
+                liftInfo.addProperty("resortID", resortID);
+                liftInfo.addProperty("seasonID", seasonID);
+                liftInfo.addProperty("day", dayID);
 
                 Channel channel = null;
                 try {
@@ -122,6 +129,7 @@ public class SkierServlet extends HttpServlet {
             }
         }
     }
+
 
     private boolean isUrlValid(String[] urlPath) {
         if (urlPath.length == 3) {

@@ -1,9 +1,10 @@
 package Client2;
 
 import io.swagger.client.ApiClient;
-import io.swagger.client.model.LiftRide;
 import com.squareup.okhttp.OkHttpClient;
 import com.squareup.okhttp.ConnectionPool;
+import com.google.common.util.concurrent.RateLimiter;
+import io.swagger.client.model.LiftRide;
 
 import java.io.IOException;
 import java.util.concurrent.*;
@@ -37,10 +38,10 @@ public class SkClient2 {
         httpClient.setConnectionPool(new ConnectionPool(500, 5, TimeUnit.MINUTES));
         ApiClient sharedClient = new ApiClient();
         sharedClient.setHttpClient(httpClient);
-        //sharedClient.setBasePath("http://localhost:8080/Server2_war_exploded");
-        //sharedClient.setBasePath("http://54.149.30.56:8080/Server2_war");
-        sharedClient.setBasePath("http://test04-1444435471.us-west-2.elb.amazonaws.com:8080/Server2_war/");
+        sharedClient.setBasePath("http://35.89.69.119:8080/Server2_war");
 
+        // 全局限流器，初始速率为每秒 5000 个请求
+        RateLimiter globalRateLimiter = RateLimiter.create(5000);
 
         // Create ExecutorService to manage threads
         ExecutorService executorService = Executors.newCachedThreadPool();
@@ -51,7 +52,7 @@ public class SkClient2 {
         System.out.println("\nStarting Phase 1 with " + INITIAL_THREADS + " threads...");
 
         for (int i = 0; i < INITIAL_THREADS; i++) {
-            executorService.submit(new SkThread(rideQueue, phase1Latch, sharedClient, INITIAL_REQUESTS_PER_THREAD));
+            executorService.submit(new SkThread(rideQueue, phase1Latch, sharedClient, INITIAL_REQUESTS_PER_THREAD, globalRateLimiter));
         }
 
         phase1Latch.await(); // Wait for all Phase 1 threads to complete
@@ -64,14 +65,7 @@ public class SkClient2 {
 
         for (int i = 0; i < PHASE2_THREADS; i++) {
             int requestsToSend = Math.min(requestsPerPhase2Thread, remainingRequests.get());
-            executorService.submit(() -> {
-                try {
-                    SkThread skThread = new SkThread(rideQueue, phase2Latch, sharedClient, requestsToSend);
-                    skThread.run();
-                } catch (Exception e) {
-                    LOGGER.log(Level.SEVERE, "Exception in Phase 2 thread", e);
-                }
-            });
+            executorService.submit(new SkThread(rideQueue, phase2Latch, sharedClient, requestsToSend, globalRateLimiter));
             remainingRequests.addAndGet(-requestsToSend);
         }
 
