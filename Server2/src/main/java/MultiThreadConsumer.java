@@ -17,7 +17,7 @@ import java.util.logging.Logger;
 
 public class MultiThreadConsumer {
     private static final String QUEUE_NAME = "SkierServletPostQueue";
-    private static final int NUM_THREADS = 40; // Adjust the number of threads based on server performance
+    private static final int NUM_THREADS = 200; // Adjust the number of threads based on server performance
     private static final Logger LOGGER = Logger.getLogger(MultiThreadConsumer.class.getName());
     private static final List<Channel> channels = new CopyOnWriteArrayList<>();
 
@@ -29,7 +29,7 @@ public class MultiThreadConsumer {
         String rabbitmqPassword = "lqc412";
 
         // Redis URI with authentication information
-        String redisURI = "redis://default:DJ1F3Mrh6bG3bfskQ59Un782HYaYAaBb@redis-17535.c285.us-west-2-2.ec2.redns.redis-cloud.com:17535";
+        String redisURI = "redis://lqc412:Password@35.165.107.222:6379";
 
         Gson gson = new Gson();
         ConnectionFactory factory = new ConnectionFactory();
@@ -68,7 +68,7 @@ public class MultiThreadConsumer {
                     Channel channel = connection.createChannel();
                     channels.add(channel);
                     channel.queueDeclare(QUEUE_NAME, false, false, false, null);
-                    channel.basicQos(200); // Limit the number of unacknowledged messages per consumer
+                    channel.basicQos(100); // Limit the number of unacknowledged messages per consumer
 
                     DeliverCallback deliverCallback = (consumerTag, delivery) -> {
                         try (Jedis jedis = jedisPool.getResource()) {

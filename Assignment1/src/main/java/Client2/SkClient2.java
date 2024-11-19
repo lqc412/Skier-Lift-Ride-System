@@ -38,7 +38,7 @@ public class SkClient2 {
         httpClient.setConnectionPool(new ConnectionPool(500, 5, TimeUnit.MINUTES));
         ApiClient sharedClient = new ApiClient();
         sharedClient.setHttpClient(httpClient);
-        sharedClient.setBasePath("http://35.89.69.119:8080/Server2_war");
+        sharedClient.setBasePath("http://35.90.159.5:8080/Server2_war");
 
         // 全局限流器，初始速率为每秒 5000 个请求
         RateLimiter globalRateLimiter = RateLimiter.create(5000);
