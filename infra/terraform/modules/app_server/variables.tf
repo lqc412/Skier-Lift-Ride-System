@@ -66,7 +66,7 @@ variable "environment_variables" {
 variable "lb_health_check_path" {
   description = "HTTP path used for ALB health checks."
   type        = string
-  default     = "/health"
+  default     = "/skiers/1/vertical"
 }
 
 variable "ami_ssm_parameter_name" {
