@@ -24,7 +24,7 @@ jq -r '
   | map(select(.value.value != null))
   | .[]
   | select(.value.type == "string")
-  | "\(.key)=\(.value.value)"
+  | "\(.key | gsub("[.-]"; "_") | ascii_upcase)=\(.value.value)"
 ' "${temp_file}" >"${OUTPUT_FILE}"
 
 echo "Wrote Terraform outputs to ${OUTPUT_FILE}"
