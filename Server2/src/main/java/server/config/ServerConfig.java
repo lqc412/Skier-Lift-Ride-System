@@ -22,7 +22,8 @@ public final class ServerConfig {
             if (inputStream != null) {
                 PROPERTIES.load(inputStream);
             } else {
-                LOGGER.warning(() -> "Configuration file '" + PROPERTIES_FILE + "' was not found on the classpath.");
+                LOGGER.log(Level.WARNING,
+                        () -> "Configuration file '" + PROPERTIES_FILE + "' was not found on the classpath.");
             }
         } catch (IOException e) {
             LOGGER.log(Level.WARNING, "Unable to load server configuration from properties file", e);
