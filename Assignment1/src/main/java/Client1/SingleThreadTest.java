@@ -17,13 +17,15 @@ public class SingleThreadTest {
         for (int test = 1; test <= numTests; test++) {
             System.out.println("Running test #" + test);
 
-            CountDownLatch latch = new CountDownLatch(1);
-            SkThread skierThread = new SkThread(numRequests, latch);
+            CountDownLatch completionLatch = new CountDownLatch(1);
+            CountDownLatch triggerLatch = new CountDownLatch(1);
+            SkThread skierThread = new SkThread(numRequests, completionLatch, triggerLatch);
 
             long startTime = System.currentTimeMillis();
 
             skierThread.start();
-            latch.await();
+            completionLatch.await();
+            triggerLatch.await();
 
             long endTime = System.currentTimeMillis();
             long totalExecutionTime = endTime - startTime;

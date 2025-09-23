@@ -19,18 +19,21 @@ public class SkThread extends Thread {
 
     private static final int RETRY_LIMIT = 5;
     private final int requestCount;
-    private final CountDownLatch latch;
+    private final CountDownLatch completionLatch;
+    private final CountDownLatch phaseTriggerLatch;
 
     /**
      * Constructs a SkThread instance with the specified number of requests
      * and a CountDownLatch to track the thread's completion.
      *
      * @param requestCount the number of POST requests to send
-     * @param latch        the latch to count down when the thread completes
+     * @param completionLatch the latch to count down when the thread completes
+     * @param phaseTriggerLatch optional latch used to signal that the thread has finished its share of Phase 1 work
      */
-    public SkThread(int requestCount, CountDownLatch latch) {
+    public SkThread(int requestCount, CountDownLatch completionLatch, CountDownLatch phaseTriggerLatch) {
         this.requestCount = requestCount;
-        this.latch = latch;
+        this.completionLatch = completionLatch;
+        this.phaseTriggerLatch = phaseTriggerLatch;
     }
 
     /**
@@ -76,8 +79,10 @@ public class SkThread extends Thread {
         }
 
         try {
-            SkClient1.latchToPhase2.countDown();
-            latch.countDown();
+            if (phaseTriggerLatch != null) {
+                phaseTriggerLatch.countDown();
+            }
+            completionLatch.countDown();
         } catch (Exception e) {
             e.printStackTrace();
         }

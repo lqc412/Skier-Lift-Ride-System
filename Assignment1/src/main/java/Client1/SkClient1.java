@@ -10,7 +10,7 @@ import java.util.concurrent.CountDownLatch;
  */
 public class SkClient1 {
 
-    protected static CountDownLatch latchToPhase2 = new CountDownLatch(1);
+    private static final double PHASE1_COMPLETION_THRESHOLD = 0.2;
     protected static Counter counter = new Counter();
 
     /**
@@ -29,7 +29,18 @@ public class SkClient1 {
         int numP1Threads = 32;
         int numP1Requests = 1000;
         CountDownLatch phase1Latch = new CountDownLatch(numP1Threads);
-        executePhase("Phase1", numP1Threads, numP1Requests, phase1Latch);
+        CountDownLatch phase1TriggerLatch = createPhase2TriggerLatch(numP1Threads);
+        startPhase("Phase1", numP1Threads, numP1Requests, phase1Latch, phase1TriggerLatch);
+
+        phase1TriggerLatch.await();
+
+        // Phase II
+        int numP2Threads = 112;
+        int numP2Requests = 1500;
+        CountDownLatch phase2Latch = new CountDownLatch(numP2Threads);
+        startPhase("Phase2", numP2Threads, numP2Requests, phase2Latch, null);
+
+        awaitPhaseCompletion("Phase1", phase1Latch, numP1Threads * numP1Requests);
         long phase1End = System.currentTimeMillis();
 
         long phase1Duration = phase1End - phase1Start;
@@ -41,16 +52,7 @@ public class SkClient1 {
         System.out.println("Phase 1 Duration: " + phase1Duration + " ms");
         System.out.println("Phase 1 Throughput: " + phase1Throughput + " requests/sec");
 
-        latchToPhase2.await();
-
-        // Phase II
-        int numP2Threads = 112;
-        int numP2Requests = 1500;
-        CountDownLatch phase2Latch = new CountDownLatch(numP2Threads);
-        executePhase("Phase2", numP2Threads, numP2Requests, phase2Latch);
-
-        phase1Latch.await();
-        phase2Latch.await();
+        awaitPhaseCompletion("Phase2", phase2Latch, numP2Threads * numP2Requests);
         long end = System.currentTimeMillis();
 
         long wallTime = end - phase1Start;
@@ -67,24 +69,45 @@ public class SkClient1 {
         System.out.println("Phase duration: " + (end - phase1Start) + " ms");
     }
 
+    protected static CountDownLatch createPhase2TriggerLatch(int totalThreads) {
+        return new CountDownLatch(calculatePhase2TriggerCount(totalThreads));
+    }
+
+    protected static int calculatePhase2TriggerCount(int totalThreads) {
+        int triggerCount = (int) Math.ceil(totalThreads * PHASE1_COMPLETION_THRESHOLD);
+        return Math.max(1, triggerCount);
+    }
+
     /**
-     * Executes a phase of requests by creating the specified number of threads,
-     * each sending the specified number of requests. After starting all threads,
-     * it waits for all of them to complete.
+     * Spins up a phase with the provided number of threads and request count.
+     * Each thread receives both the completion latch for its phase and an optional
+     * trigger latch used to coordinate the start of the next phase.
      *
-     * @param phaseName       name of the phase (for logging purposes)
-     * @param numberOfThreads the number of threads to spawn
-     * @param numOfRequests   the number of requests each thread should send
-     * @param latch           a CountDownLatch used for synchronization
-     * @throws InterruptedException if the thread is interrupted while waiting for all threads to finish
+     * @param phaseName         the logging name of the phase
+     * @param numberOfThreads   number of worker threads to start
+     * @param numOfRequests     number of requests assigned to each thread
+     * @param completionLatch   latch decremented when each thread completes its work
+     * @param phaseTriggerLatch optional latch used to signal when the phase has reached the trigger threshold
      */
-    private static void executePhase(String phaseName, int numberOfThreads, int numOfRequests, CountDownLatch latch) throws InterruptedException {
+    private static void startPhase(String phaseName, int numberOfThreads, int numOfRequests,
+                                   CountDownLatch completionLatch, CountDownLatch phaseTriggerLatch) {
         System.out.println(phaseName + " is starting...");
         for (int i = 0; i < numberOfThreads; i++) {
-            SkThread skierThread = new SkThread(numOfRequests, latch);
+            SkThread skierThread = new SkThread(numOfRequests, completionLatch, phaseTriggerLatch);
             skierThread.start();
         }
+    }
+
+    /**
+     * Blocks until the given phase completes and logs its completion message.
+     *
+     * @param phaseName     the logging name of the phase
+     * @param latch         latch tracking remaining running threads for the phase
+     * @param totalRequests total number of requests issued during the phase
+     * @throws InterruptedException if waiting for completion is interrupted
+     */
+    private static void awaitPhaseCompletion(String phaseName, CountDownLatch latch, int totalRequests) throws InterruptedException {
         latch.await();
-        System.out.println(phaseName + " completed " + (numOfRequests * numberOfThreads) + " requests");
+        System.out.println(phaseName + " completed " + totalRequests + " requests");
     }
 }
