@@ -8,6 +8,7 @@ import entity.SkierVertical;
 import entity.VerticalElement;
 import org.apache.commons.pool2.ObjectPool;
 import org.apache.commons.pool2.impl.GenericObjectPool;
+import server.config.ServerConfig;
 
 import javax.servlet.*;
 import javax.servlet.http.*;
@@ -23,9 +24,10 @@ public class SkierServlet extends HttpServlet {
     private static final Logger logger = Logger.getLogger(SkierServlet.class.getName());
     private Gson gson = new Gson();
     private ObjectPool<Channel> pool;
-    private final static String QUEUE_NAME = "SkierServletPostQueue";
+    private String queueName;
 
     public void init() {
+        this.queueName = ServerConfig.getQueueName();
         this.pool = new GenericObjectPool<>(new ConnectionPoolFactory());
         logger.info("SkierServlet initialized with a channel pool.");
     }
@@ -110,9 +112,9 @@ public class SkierServlet extends HttpServlet {
                 Channel channel = null;
                 try {
                     channel = pool.borrowObject();
-                    channel.queueDeclare(QUEUE_NAME, false, false, false, null);
-                    channel.basicPublish("", QUEUE_NAME, null, liftInfo.toString().getBytes());
-                    logger.info("Message published to queue: " + QUEUE_NAME + " with data: " + liftInfo);
+                    channel.queueDeclare(queueName, false, false, false, null);
+                    channel.basicPublish("", queueName, null, liftInfo.toString().getBytes());
+                    logger.info("Message published to queue: " + queueName + " with data: " + liftInfo);
                 } catch (Exception e) {
                     logger.log(Level.SEVERE, "Unable to borrow channel from pool", e);
                     throw new RuntimeException("Unable to borrow from pool", e);

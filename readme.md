@@ -53,6 +53,69 @@ This project simulates a skier lift ride system using a distributed architecture
     - Ensure the server endpoint is reachable.
 
 
+## Configuration
+
+The clients (`Assignment1`) and the server/consumer module (`Server2`) now read their connection
+settings from an `application.properties` file on the classpath. Any property can be overridden by
+defining an environment variable whose name is the upper snake case representation of the property
+key (for example, `client.api.baseUrl` can be overridden with `CLIENT_API_BASE_URL`).
+
+### Assignment1 client settings
+
+File: `Assignment1/src/main/resources/application.properties`
+
+| Property key         | Environment override      | Description                             |
+|----------------------|---------------------------|-----------------------------------------|
+| `client.api.baseUrl` | `CLIENT_API_BASE_URL`     | Base URL of the skier service endpoint. |
+
+**Local example**
+
+```
+client.api.baseUrl=http://localhost:8080/Server2_war
+```
+
+**Cloud example**
+
+```
+CLIENT_API_BASE_URL=https://your-cloud-endpoint.example.com/Server2_war
+```
+
+### Server2 settings
+
+File: `Server2/src/main/resources/application.properties`
+
+| Property key        | Environment override | Description                                      |
+|---------------------|----------------------|--------------------------------------------------|
+| `rabbitmq.host`     | `RABBITMQ_HOST`      | RabbitMQ server hostname.                        |
+| `rabbitmq.port`     | `RABBITMQ_PORT`      | RabbitMQ server port.                            |
+| `rabbitmq.username` | `RABBITMQ_USERNAME`  | RabbitMQ username.                               |
+| `rabbitmq.password` | `RABBITMQ_PASSWORD`  | RabbitMQ password.                               |
+| `queue.name`        | `QUEUE_NAME`         | RabbitMQ queue used by the servlet and consumer. |
+| `redis.uri`         | `REDIS_URI`          | Redis connection URI (including credentials).    |
+
+**Local example**
+
+```
+rabbitmq.host=localhost
+rabbitmq.port=5672
+rabbitmq.username=guest
+rabbitmq.password=guest
+queue.name=SkierServletPostQueue
+redis.uri=redis://localhost:6379
+```
+
+**Cloud example**
+
+```
+export RABBITMQ_HOST=your-rabbitmq-host
+export RABBITMQ_PORT=5672
+export RABBITMQ_USERNAME=prod-user
+export RABBITMQ_PASSWORD=prod-password
+export QUEUE_NAME=SkierServletPostQueue
+export REDIS_URI=redis://prod-user:prod-password@your-redis-host:6379
+```
+
+
 ## System Requirements
 
 - **Java**: JDK 8 or higher.
