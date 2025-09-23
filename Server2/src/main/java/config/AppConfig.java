@@ -146,6 +146,10 @@ public final class AppConfig {
         return getString("rabbitmq.password", "guest");
     }
 
+    public static boolean isRabbitUseSsl() {
+        return Boolean.parseBoolean(getString("rabbitmq.use-ssl", "false"));
+    }
+
     public static String getRedisUri() {
         return getString("redis.uri", "redis://localhost:6379");
     }

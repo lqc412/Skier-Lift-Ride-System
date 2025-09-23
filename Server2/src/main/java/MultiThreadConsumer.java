@@ -14,6 +14,8 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -97,6 +99,13 @@ public class MultiThreadConsumer implements AutoCloseable {
         factory.setPort(AppConfig.getRabbitPort());
         factory.setUsername(AppConfig.getRabbitUsername());
         factory.setPassword(AppConfig.getRabbitPassword());
+        if (AppConfig.isRabbitUseSsl()) {
+            try {
+                factory.useSslProtocol();
+            } catch (NoSuchAlgorithmException | KeyManagementException e) {
+                throw new IllegalStateException("Failed to enable SSL for RabbitMQ connection", e);
+            }
+        }
         return factory;
     }
 
