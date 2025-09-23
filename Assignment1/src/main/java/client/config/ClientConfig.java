@@ -24,7 +24,7 @@ public final class ClientConfig {
                 PROPERTIES.load(inputStream);
             } else {
                 LOGGER.log(Level.WARNING,
-                        () -> "Configuration file '" + PROPERTIES_FILE + "' was not found on the classpath.");
+                        "Configuration file '" + PROPERTIES_FILE + "' was not found on the classpath.");
             }
         } catch (IOException e) {
             LOGGER.log(Level.WARNING, "Unable to load client configuration from properties file", e);
