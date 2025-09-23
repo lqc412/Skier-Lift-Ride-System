@@ -43,6 +43,12 @@ public class SkierServlet extends HttpServlet {
         res.setCharacterEncoding("UTF-8");
         String urlPath = req.getPathInfo();
 
+        if ("/health".equals(urlPath)) {
+            res.setStatus(HttpServletResponse.SC_OK);
+            res.getWriter().write(gson.toJson(Collections.singletonMap("status", "UP")));
+            return;
+        }
+
         if (urlPath == null || urlPath.isEmpty()) {
             res.setStatus(HttpServletResponse.SC_NOT_FOUND);
             res.getWriter().write(gson.toJson(new ResponseMsg("Missing Parameter")));
