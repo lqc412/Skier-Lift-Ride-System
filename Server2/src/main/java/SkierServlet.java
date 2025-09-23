@@ -8,26 +8,33 @@ import entity.SkierVertical;
 import entity.VerticalElement;
 import org.apache.commons.pool2.ObjectPool;
 import org.apache.commons.pool2.impl.GenericObjectPool;
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.JedisPoolConfig;
 
 import javax.servlet.*;
 import javax.servlet.http.*;
 import javax.servlet.annotation.*;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 @WebServlet(name = "SkierServlet", value = "/skiers/*")
 public class SkierServlet extends HttpServlet {
     private static final Logger logger = Logger.getLogger(SkierServlet.class.getName());
-    private Gson gson = new Gson();
+    private final Gson gson = new Gson();
     private ObjectPool<Channel> pool;
+    private JedisPool jedisPool;
     private final static String QUEUE_NAME = "SkierServletPostQueue";
+    private final static String DEFAULT_REDIS_URI = "redis://lqc412:Password@35.165.107.222:6379";
 
     public void init() {
         this.pool = new GenericObjectPool<>(new ConnectionPoolFactory());
-        logger.info("SkierServlet initialized with a channel pool.");
+        this.jedisPool = buildJedisPool();
+        logger.info("SkierServlet initialized with a channel pool and Redis connection pool.");
     }
 
     @Override
@@ -50,13 +57,17 @@ public class SkierServlet extends HttpServlet {
         } else {
             res.setStatus(HttpServletResponse.SC_OK);
             if (urlParts.length == 3) {
-                List<VerticalElement> vrl = new ArrayList<>();
-                vrl.add(new VerticalElement("string", 32));
-                SkierVertical skierVertical = new SkierVertical(vrl);
+                String skierId = urlParts[1];
+                SkierVertical skierVertical = fetchTotalVertical(skierId);
                 res.getWriter().write(gson.toJson(skierVertical));
                 logger.info("Responded with SkierVertical data for URL: " + urlPath);
             } else {
-                res.getWriter().write("it works001");
+                int resortId = Integer.parseInt(urlParts[1]);
+                String seasonId = urlParts[3];
+                String dayId = urlParts[5];
+                String skierId = urlParts[7];
+                SkierVertical skierVertical = fetchDailyVertical(resortId, seasonId, dayId, skierId);
+                res.getWriter().write(gson.toJson(skierVertical));
                 logger.info("GET request successful for URL: " + urlPath);
             }
         }
@@ -142,5 +153,73 @@ public class SkierServlet extends HttpServlet {
                     Integer.parseInt(urlPath[5]) <= 365;
         }
         return false;
+    }
+
+    private JedisPool buildJedisPool() {
+        String redisUri = Optional.ofNullable(System.getenv("REDIS_URI"))
+                .filter(s -> !s.isEmpty())
+                .orElse(DEFAULT_REDIS_URI);
+        try {
+            return new JedisPool(new JedisPoolConfig(), new URI(redisUri));
+        } catch (URISyntaxException e) {
+            logger.log(Level.SEVERE, "Invalid Redis URI", e);
+            throw new RuntimeException("Unable to configure Redis connection", e);
+        }
+    }
+
+    private SkierVertical fetchTotalVertical(String skierId) {
+        Map<String, Integer> seasonTotals = new HashMap<>();
+        try (Jedis jedis = jedisPool.getResource()) {
+            Set<String> seasonDays = jedis.smembers("skier:" + skierId + ":days");
+            for (String seasonDay : seasonDays) {
+                String seasonId = "TOTAL";
+                String dayId = seasonDay;
+                if (seasonDay.contains("|")) {
+                    String[] parts = seasonDay.split("\\|", 2);
+                    seasonId = parts[0];
+                    dayId = parts[1];
+                }
+                String verticalKey = "skier:" + skierId + ":day:" + dayId + ":vertical";
+                String verticalString = jedis.get(verticalKey);
+                if (verticalString == null) {
+                    continue;
+                }
+                int vertical = Integer.parseInt(verticalString);
+                seasonTotals.merge(seasonId, vertical, Integer::sum);
+            }
+        }
+
+        if (seasonTotals.isEmpty()) {
+            seasonTotals.put("TOTAL", 0);
+        }
+
+        List<VerticalElement> elements = new ArrayList<>();
+        seasonTotals.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .forEach(entry -> elements.add(new VerticalElement(entry.getKey(), entry.getValue())));
+        return new SkierVertical(elements);
+    }
+
+    private SkierVertical fetchDailyVertical(int resortId, String seasonId, String dayId, String skierId) {
+        int dailyVertical = 0;
+        try (Jedis jedis = jedisPool.getResource()) {
+            boolean visited = jedis.sismember("resort:" + resortId + ":day:" + dayId + ":visitors", skierId);
+            if (!visited) {
+                return new SkierVertical(Collections.singletonList(new VerticalElement(seasonId, 0)));
+            }
+            String verticalString = jedis.get("skier:" + skierId + ":day:" + dayId + ":vertical");
+            if (verticalString != null) {
+                dailyVertical = Integer.parseInt(verticalString);
+            }
+        }
+        return new SkierVertical(Collections.singletonList(new VerticalElement(seasonId, dailyVertical)));
+    }
+
+    @Override
+    public void destroy() {
+        super.destroy();
+        if (jedisPool != null) {
+            jedisPool.close();
+        }
     }
 }
