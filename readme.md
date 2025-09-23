@@ -1,5 +1,7 @@
 # Skier Lift Ride System
 
+[![CI](https://github.com/OWNER/Skier-Lift-Ride-System/actions/workflows/maven.yml/badge.svg)](https://github.com/OWNER/Skier-Lift-Ride-System/actions/workflows/maven.yml)
+
 This project simulates a skier lift ride system using a distributed architecture consisting of a server, client, and RabbitMQ consumer. The system handles multiple POST requests for skier lift rides and stores them asynchronously for further processing.
 
 ## Project Components
@@ -33,6 +35,12 @@ This project simulates a skier lift ride system using a distributed architecture
 - **How to Run**:
     1. Ensure RabbitMQ is installed and configured correctly.
     2. Run `MultiThreadConsumer` to start consuming messages from the queue.
+
+## Testing & Continuous Integration
+
+- Run client tests: `mvn -f Assignment1/pom.xml test`
+- Run server tests: `mvn -f Server2/pom.xml test`
+- Continuous integration is configured via GitHub Actions (`.github/workflows/maven.yml`) to execute both commands on every push.
 
 ## Setup Instructions
 

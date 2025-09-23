@@ -143,4 +143,8 @@ public class SkierServlet extends HttpServlet {
         }
         return false;
     }
+
+    void setChannelPool(ObjectPool<Channel> pool) {
+        this.pool = pool;
+    }
 }

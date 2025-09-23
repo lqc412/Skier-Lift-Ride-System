@@ -27,6 +27,8 @@ public class SkThread implements Runnable {
     private ApiClient apiClient;
     private int numRequests;
     private RateLimiter rateLimiter;
+    private final SkiersApiFactory apiFactory;
+    private final Sleeper sleeper;
 
     // 断路器相关变量
     private static volatile boolean circuitBreakerOpen = false;
@@ -36,16 +38,23 @@ public class SkThread implements Runnable {
     private static long circuitBreakerOpenedTime = 0;
 
     public SkThread(BlockingQueue<LiftRide> rideQueue, CountDownLatch curLatch, ApiClient apiClient, int numRequests, RateLimiter rateLimiter) {
+        this(rideQueue, curLatch, apiClient, numRequests, rateLimiter, SkiersApiFactory.defaultFactory(), Sleeper.threadSleeper());
+    }
+
+    SkThread(BlockingQueue<LiftRide> rideQueue, CountDownLatch curLatch, ApiClient apiClient, int numRequests, RateLimiter rateLimiter,
+             SkiersApiFactory apiFactory, Sleeper sleeper) {
         this.rideQueue = rideQueue;
         this.curLatch = curLatch;
         this.apiClient = apiClient;
         this.numRequests = numRequests;
         this.rateLimiter = rateLimiter;
+        this.apiFactory = apiFactory;
+        this.sleeper = sleeper;
     }
 
     @Override
     public void run() {
-        SkiersApi apiInstance = new SkiersApi(apiClient);
+        SkiersApi apiInstance = apiFactory.create(apiClient);
 
         for (int i = 0; i < numRequests; i++) {
             try {
@@ -61,7 +70,7 @@ public class SkThread implements Runnable {
                         LOGGER.info("Circuit breaker closed. Resuming requests.");
                     } else {
                         // 暂停一段时间再检查
-                        Thread.sleep(1000);
+                        sleeper.sleep(1000);
                         i--; // 不计入请求次数
                         continue;
                     }
@@ -102,8 +111,7 @@ public class SkThread implements Runnable {
                             e.printStackTrace();
                         }
                         // 引入指数退避
-                        int backoffTime = (int) Math.pow(2, j);
-                        Thread.sleep(Math.min(backoffTime * 1000, 10000)); // 最大等待时间 10 秒
+                        sleeper.sleep(calculateBackoffMillis(j));
                     }
                 }
 
@@ -126,5 +134,34 @@ public class SkThread implements Runnable {
 
         // 当前线程处理完成，减少 CountDownLatch 的计数
         curLatch.countDown();
+    }
+
+    static long calculateBackoffMillis(int attempt) {
+        long backoff = (long) Math.pow(2, attempt) * 1000L;
+        return Math.min(backoff, 10000L);
+    }
+
+    static void resetCircuitBreakerForTest() {
+        circuitBreakerOpen = false;
+        consecutiveFailures.set(0);
+        circuitBreakerOpenedTime = 0L;
+    }
+}
+
+@FunctionalInterface
+interface SkiersApiFactory {
+    SkiersApi create(ApiClient apiClient);
+
+    static SkiersApiFactory defaultFactory() {
+        return SkiersApi::new;
+    }
+}
+
+@FunctionalInterface
+interface Sleeper {
+    void sleep(long millis) throws InterruptedException;
+
+    static Sleeper threadSleeper() {
+        return millis -> Thread.sleep(millis);
     }
 }

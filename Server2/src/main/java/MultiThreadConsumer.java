@@ -70,39 +70,7 @@ public class MultiThreadConsumer {
                     channel.queueDeclare(QUEUE_NAME, false, false, false, null);
                     channel.basicQos(100); // Limit the number of unacknowledged messages per consumer
 
-                    DeliverCallback deliverCallback = (consumerTag, delivery) -> {
-                        try (Jedis jedis = jedisPool.getResource()) {
-                            String message = new String(delivery.getBody(), StandardCharsets.UTF_8);
-                            JsonObject jsonObject = gson.fromJson(message, JsonObject.class);
-
-                            // Retrieve skierID, day, liftID from the message
-                            Integer skierID = jsonObject.get("skierID").getAsInt();
-                            String day = jsonObject.get("day").getAsString();
-                            int liftID = jsonObject.get("liftID").getAsInt();
-                            int vertical = liftID * 10;
-
-                            // Design of keys in Redis
-                            String skierDaysKey = "skier:" + skierID + ":days";
-                            String skierVerticalKey = "skier:" + skierID + ":day:" + day + ":vertical";
-                            String skierLiftsKey = "skier:" + skierID + ":day:" + day + ":lifts";
-                            String resortVisitorsKey = "resort:" + jsonObject.get("resortID").getAsString() + ":day:" + day + ":visitors";
-
-                            // Use Pipeline to improve Redis operation performance
-                            Pipeline pipeline = jedis.pipelined();
-                            pipeline.sadd(skierDaysKey, day); // Record the days the skier has skied
-                            pipeline.incrBy(skierVerticalKey, vertical); // Update the total vertical for each day
-                            pipeline.rpush(skierLiftsKey, String.valueOf(liftID)); // Record the lifts the skier has taken each day
-                            pipeline.sadd(resortVisitorsKey, String.valueOf(skierID)); // Record skiers who visited a resort
-                            pipeline.sync();
-
-                            // Acknowledge that the message has been processed
-                            channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
-                        } catch (Exception e) {
-                            LOGGER.log(Level.SEVERE, "Exception occurred while processing message", e);
-                            // Reject the message without requeueing
-                            channel.basicNack(delivery.getEnvelope().getDeliveryTag(), false, false);
-                        }
-                    };
+                    DeliverCallback deliverCallback = createDeliverCallback(channel, jedisPool, gson);
 
                     channel.basicConsume(QUEUE_NAME, false, deliverCallback, consumerTag -> {
                     });
@@ -134,5 +102,41 @@ public class MultiThreadConsumer {
                 LOGGER.log(Level.SEVERE, "Exception occurred during shutdown", e);
             }
         }));
+    }
+
+    static DeliverCallback createDeliverCallback(Channel channel, JedisPool jedisPool, Gson gson) {
+        return (consumerTag, delivery) -> {
+            try (Jedis jedis = jedisPool.getResource()) {
+                String message = new String(delivery.getBody(), StandardCharsets.UTF_8);
+                JsonObject jsonObject = gson.fromJson(message, JsonObject.class);
+
+                // Retrieve skierID, day, liftID from the message
+                Integer skierID = jsonObject.get("skierID").getAsInt();
+                String day = jsonObject.get("day").getAsString();
+                int liftID = jsonObject.get("liftID").getAsInt();
+                int vertical = liftID * 10;
+
+                // Design of keys in Redis
+                String skierDaysKey = "skier:" + skierID + ":days";
+                String skierVerticalKey = "skier:" + skierID + ":day:" + day + ":vertical";
+                String skierLiftsKey = "skier:" + skierID + ":day:" + day + ":lifts";
+                String resortVisitorsKey = "resort:" + jsonObject.get("resortID").getAsString() + ":day:" + day + ":visitors";
+
+                // Use Pipeline to improve Redis operation performance
+                Pipeline pipeline = jedis.pipelined();
+                pipeline.sadd(skierDaysKey, day); // Record the days the skier has skied
+                pipeline.incrBy(skierVerticalKey, vertical); // Update the total vertical for each day
+                pipeline.rpush(skierLiftsKey, String.valueOf(liftID)); // Record the lifts the skier has taken each day
+                pipeline.sadd(resortVisitorsKey, String.valueOf(skierID)); // Record skiers who visited a resort
+                pipeline.sync();
+
+                // Acknowledge that the message has been processed
+                channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Exception occurred while processing message", e);
+                // Reject the message without requeueing
+                channel.basicNack(delivery.getEnvelope().getDeliveryTag(), false, false);
+            }
+        };
     }
 }
