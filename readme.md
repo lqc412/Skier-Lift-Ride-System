@@ -95,6 +95,24 @@ For convenience a `.env.example` file shows how to configure the system for loca
 2. **Asynchronous processing** – `MultiThreadConsumer` pulls messages, calculates lift-derived vertical totals, and updates Redis keys for skier-day verticals, visited days, and resort visitor sets.
 3. **Redis-backed reads** – Subsequent GET requests use Redis to retrieve the pre-computed information. Totals are aggregated into the `SkierVertical` DTO before being returned to clients.
 
+## Integration Testing
+
+An end-to-end integration suite lives under `Server2/src/test/java`. The tests start ephemeral RabbitMQ and Redis containers with [Testcontainers](https://www.testcontainers.org/), boot an embedded Jetty servlet container hosting `SkierServlet`, and launch `MultiThreadConsumer` in the background. The suite exercises POST/GET flows, verifies Redis mutations, and covers both the modern and legacy key paths inside `fetchTotalVertical` and `fetchDailyVertical`.
+
+To run the integration tests locally you will need Docker available on your machine. From the `Server2` directory execute:
+
+```
+mvn verify
+```
+
+`mvn verify` runs the standard unit tests via Surefire and the integration tests via Failsafe. You can also focus on the integration suite alone with:
+
+```
+mvn failsafe:integration-test failsafe:verify
+```
+
+The Testcontainers-managed services are started and torn down automatically; no manual RabbitMQ or Redis setup is required for the tests.
+
 ## Sample Responses
 
 ### Total vertical for a skier

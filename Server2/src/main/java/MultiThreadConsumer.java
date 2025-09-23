@@ -1,6 +1,9 @@
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
-import com.rabbitmq.client.*;
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.DeliverCallback;
 import config.AppConfig;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
@@ -12,63 +15,104 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class MultiThreadConsumer {
-    private static final String QUEUE_NAME = AppConfig.getQueueName();
-    private static final int NUM_THREADS = 200; // Adjust the number of threads based on server performance
+public class MultiThreadConsumer implements AutoCloseable {
+    private static final int DEFAULT_NUM_THREADS = 200; // Adjust the number of threads based on server performance
     private static final Logger LOGGER = Logger.getLogger(MultiThreadConsumer.class.getName());
-    private static final List<Channel> channels = new CopyOnWriteArrayList<>();
+
+    private final Gson gson = new Gson();
+    private final String queueName;
+    private final Connection connection;
+    private final JedisPool jedisPool;
+    private final ExecutorService executorService;
+    private final List<Channel> channels = new CopyOnWriteArrayList<>();
+    private final CountDownLatch shutdownLatch = new CountDownLatch(1);
+    private final boolean closeJedisPoolOnShutdown;
+    private final int numThreads;
+    private final AtomicBoolean closed = new AtomicBoolean(false);
+
+    private MultiThreadConsumer(Connection connection, JedisPool jedisPool, String queueName, int numThreads, boolean closeJedisPoolOnShutdown) {
+        this.connection = connection;
+        this.jedisPool = jedisPool;
+        this.queueName = queueName;
+        this.numThreads = numThreads;
+        this.executorService = Executors.newFixedThreadPool(numThreads);
+        this.closeJedisPoolOnShutdown = closeJedisPoolOnShutdown;
+    }
 
     public static void main(String[] args) throws Exception {
-        // Configuration parameters can be read from config files or environment variables
-        String rabbitmqHost = AppConfig.getRabbitHost();
-        int rabbitmqPort = AppConfig.getRabbitPort();
-        String rabbitmqUsername = AppConfig.getRabbitUsername();
-        String rabbitmqPassword = AppConfig.getRabbitPassword();
+        MultiThreadConsumer consumer = startDefault();
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try {
+                consumer.close();
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Exception occurred during shutdown", e);
+            }
+        }));
 
-        // Redis URI with authentication information
-        String redisURI = AppConfig.getRedisUri();
+        try {
+            consumer.awaitTermination();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            consumer.close();
+        }
+    }
 
-        Gson gson = new Gson();
-        ConnectionFactory factory = new ConnectionFactory();
+    public static MultiThreadConsumer startDefault() throws Exception {
+        ConnectionFactory factory = buildDefaultConnectionFactory();
+        JedisPool jedisPool = buildDefaultJedisPool();
+        return start(factory, jedisPool, AppConfig.getQueueName(), DEFAULT_NUM_THREADS, true);
+    }
 
-        // Configure RabbitMQ connection
-        factory.setHost(rabbitmqHost);
-        factory.setPort(rabbitmqPort);
-        factory.setUsername(rabbitmqUsername);
-        factory.setPassword(rabbitmqPassword);
+    public static MultiThreadConsumer start(ConnectionFactory factory, JedisPool jedisPool, String queueName, int numThreads) throws Exception {
+        return start(factory, jedisPool, queueName, numThreads, false);
+    }
+
+    private static MultiThreadConsumer start(ConnectionFactory factory, JedisPool jedisPool, String queueName, int numThreads, boolean closeJedisPoolOnShutdown) throws Exception {
+        Objects.requireNonNull(factory, "ConnectionFactory must not be null");
+        Objects.requireNonNull(jedisPool, "JedisPool must not be null");
+        Objects.requireNonNull(queueName, "Queue name must not be null");
+
         LOGGER.info("Attempting to connect to RabbitMQ...");
         Connection connection = factory.newConnection();
         LOGGER.info("RabbitMQ connection successful");
 
-        // Create Jedis connection pool
-        JedisPoolConfig poolConfig = new JedisPoolConfig();
-        // Configure connection pool parameters as needed
+        MultiThreadConsumer consumer = new MultiThreadConsumer(connection, jedisPool, queueName, numThreads, closeJedisPoolOnShutdown);
+        consumer.startConsumers();
+        return consumer;
+    }
 
-        // Parse Redis URI
-        URI redisUri = null;
-        try {
-            redisUri = new URI(redisURI);
-        } catch (URISyntaxException e) {
-            LOGGER.log(Level.SEVERE, "Redis URI format error", e);
-            return;
-        }
+    private static ConnectionFactory buildDefaultConnectionFactory() {
+        ConnectionFactory factory = new ConnectionFactory();
+        factory.setHost(AppConfig.getRabbitHost());
+        factory.setPort(AppConfig.getRabbitPort());
+        factory.setUsername(AppConfig.getRabbitUsername());
+        factory.setPassword(AppConfig.getRabbitPassword());
+        return factory;
+    }
 
-        // Create JedisPool and declare as final
-        final JedisPool jedisPool = new JedisPool(poolConfig, redisUri);
-        LOGGER.info("Redis connection pool created successfully");
+    private static JedisPool buildDefaultJedisPool() throws URISyntaxException {
+        String redisURI = AppConfig.getRedisUri();
+        URI uri = new URI(redisURI);
+        return new JedisPool(new JedisPoolConfig(), uri);
+    }
 
-        ExecutorService pool = Executors.newFixedThreadPool(NUM_THREADS);
-
-        for (int i = 0; i < NUM_THREADS; i++) {
-            pool.execute(() -> {
+    private void startConsumers() {
+        for (int i = 0; i < numThreads; i++) {
+            executorService.execute(() -> {
                 try {
                     Channel channel = connection.createChannel();
                     channels.add(channel);
-                    channel.queueDeclare(QUEUE_NAME, false, false, false, null);
+                    channel.queueDeclare(queueName, false, false, false, null);
                     channel.basicQos(100); // Limit the number of unacknowledged messages per consumer
 
                     DeliverCallback deliverCallback = (consumerTag, delivery) -> {
@@ -102,40 +146,60 @@ public class MultiThreadConsumer {
                             channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
                         } catch (Exception e) {
                             LOGGER.log(Level.SEVERE, "Exception occurred while processing message", e);
-                            // Reject the message without requeueing
-                            channel.basicNack(delivery.getEnvelope().getDeliveryTag(), false, false);
+                            try {
+                                channel.basicNack(delivery.getEnvelope().getDeliveryTag(), false, false);
+                            } catch (IOException ioException) {
+                                LOGGER.log(Level.SEVERE, "Failed to nack delivery", ioException);
+                            }
                         }
                     };
 
-                    channel.basicConsume(QUEUE_NAME, false, deliverCallback, consumerTag -> {
+                    channel.basicConsume(queueName, false, deliverCallback, consumerTag -> {
                     });
                 } catch (IOException e) {
                     LOGGER.log(Level.SEVERE, "Exception occurred in consumer thread", e);
                 }
             });
         }
+    }
 
-        // Gracefully shut down threads and resources
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            LOGGER.info("Shutting down consumer threads...");
-            pool.shutdown();
-            try {
-                if (!pool.awaitTermination(5, TimeUnit.SECONDS)) {
-                    pool.shutdownNow();
-                }
-                // Close all channels
-                for (Channel channel : channels) {
-                    try {
-                        channel.close();
-                    } catch (IOException | TimeoutException e) {
-                        LOGGER.log(Level.SEVERE, "Exception occurred while closing channel", e);
-                    }
-                }
-                connection.close();
-                jedisPool.close();
-            } catch (Exception e) {
-                LOGGER.log(Level.SEVERE, "Exception occurred during shutdown", e);
+    public void awaitTermination() throws InterruptedException {
+        shutdownLatch.await();
+    }
+
+    @Override
+    public void close() {
+        if (!closed.compareAndSet(false, true)) {
+            return;
+        }
+
+        try {
+            executorService.shutdownNow();
+            if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
+                LOGGER.warning("Consumer threads did not terminate within the timeout");
             }
-        }));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        for (Channel channel : channels) {
+            try {
+                channel.close();
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Exception occurred while closing channel", e);
+            }
+        }
+
+        try {
+            connection.close();
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Exception occurred while closing connection", e);
+        }
+
+        if (closeJedisPoolOnShutdown) {
+            jedisPool.close();
+        }
+
+        shutdownLatch.countDown();
     }
 }
