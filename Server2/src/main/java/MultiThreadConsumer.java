@@ -1,6 +1,7 @@
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.rabbitmq.client.*;
+import config.AppConfig;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
@@ -16,20 +17,20 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class MultiThreadConsumer {
-    private static final String QUEUE_NAME = "SkierServletPostQueue";
+    private static final String QUEUE_NAME = AppConfig.getQueueName();
     private static final int NUM_THREADS = 200; // Adjust the number of threads based on server performance
     private static final Logger LOGGER = Logger.getLogger(MultiThreadConsumer.class.getName());
     private static final List<Channel> channels = new CopyOnWriteArrayList<>();
 
     public static void main(String[] args) throws Exception {
         // Configuration parameters can be read from config files or environment variables
-        String rabbitmqHost = "54.188.239.188";
-        int rabbitmqPort = 5672;
-        String rabbitmqUsername = "lqc412";
-        String rabbitmqPassword = "lqc412";
+        String rabbitmqHost = AppConfig.getRabbitHost();
+        int rabbitmqPort = AppConfig.getRabbitPort();
+        String rabbitmqUsername = AppConfig.getRabbitUsername();
+        String rabbitmqPassword = AppConfig.getRabbitPassword();
 
         // Redis URI with authentication information
-        String redisURI = "redis://lqc412:Password@35.165.107.222:6379";
+        String redisURI = AppConfig.getRedisUri();
 
         Gson gson = new Gson();
         ConnectionFactory factory = new ConnectionFactory();

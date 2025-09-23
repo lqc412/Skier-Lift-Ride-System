@@ -53,6 +53,29 @@ This project simulates a skier lift ride system using a distributed architecture
     - Ensure the server endpoint is reachable.
 
 
+## Configuration
+
+Runtime credentials and target URLs are provided through a shared `config.AppConfig` helper that reads from environment variables, a properties file, or sensible defaults (in that order). You can point to a custom properties file by setting `APP_CONFIG_FILE`; otherwise the helper looks for `config/app.properties` relative to the working directory.
+
+The following environment variables are recognized:
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `CLIENT1_BASEURL` | Base URL used by the phase-one client. | `http://localhost:8080/Server_war_exploded` |
+| `CLIENT2_BASEURL` | Base URL used by the high-throughput client. | `http://localhost:8080/Server2_war` |
+| `CLIENT2_RATE_LIMIT` | Requests per second enforced by the rate limiter shared by client threads. | `5000` |
+| `CLIENT2_FAILURE_THRESHOLD` | Consecutive failure count that opens the client circuit breaker. | `100` |
+| `CLIENT2_CIRCUIT_BREAKER_TIMEOUT_MS` | Time in milliseconds before the circuit breaker attempts to close. | `10000` |
+| `RABBITMQ_HOST` | Hostname of the RabbitMQ broker. | `localhost` |
+| `RABBITMQ_PORT` | Broker port. | `5672` |
+| `RABBITMQ_USERNAME` | RabbitMQ username. | `guest` |
+| `RABBITMQ_PASSWORD` | RabbitMQ password. | `guest` |
+| `REDIS_URI` | Redis connection URI, including credentials if required. | `redis://localhost:6379` |
+| `QUEUE_NAME` | Name of the queue shared between the servlet and consumer. | `SkierServletPostQueue` |
+
+For convenience a `.env.example` file shows how to configure the system for local, staging, and production environments. Copy it to `.env`, adjust the values, and export them into your shell (for example via `source .env`) before running any module. The `.env` file is ignored by Git to keep secrets out of version control.
+
+
 ## System Requirements
 
 - **Java**: JDK 8 or higher.

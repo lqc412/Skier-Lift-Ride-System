@@ -1,5 +1,6 @@
 package Client1;
 
+import config.AppConfig;
 import io.swagger.client.ApiClient;
 import io.swagger.client.ApiException;
 import io.swagger.client.ApiResponse;
@@ -40,8 +41,7 @@ public class SkThread extends Thread {
     public void run() {
         SkiersApi apiInstance = new SkiersApi();
         ApiClient client = apiInstance.getApiClient();
-//        String serverUrl = "http://localhost:8080/Server_war_exploded";
-        String serverUrl = "http://52.33.1.66:8080/Server_war";
+        String serverUrl = AppConfig.getClient1BaseUrl();
         client.setBasePath(serverUrl);
         Random random = new Random();
 

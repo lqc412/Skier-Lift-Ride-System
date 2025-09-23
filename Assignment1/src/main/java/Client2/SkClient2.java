@@ -1,5 +1,6 @@
 package Client2;
 
+import config.AppConfig;
 import io.swagger.client.ApiClient;
 import com.squareup.okhttp.OkHttpClient;
 import com.squareup.okhttp.ConnectionPool;
@@ -38,10 +39,10 @@ public class SkClient2 {
         httpClient.setConnectionPool(new ConnectionPool(500, 5, TimeUnit.MINUTES));
         ApiClient sharedClient = new ApiClient();
         sharedClient.setHttpClient(httpClient);
-        sharedClient.setBasePath("http://35.90.159.5:8080/Server2_war");
+        sharedClient.setBasePath(AppConfig.getClient2BaseUrl());
 
         // 全局限流器，初始速率为每秒 5000 个请求
-        RateLimiter globalRateLimiter = RateLimiter.create(5000);
+        RateLimiter globalRateLimiter = RateLimiter.create(AppConfig.getClient2RateLimit());
 
         // Create ExecutorService to manage threads
         ExecutorService executorService = Executors.newCachedThreadPool();
