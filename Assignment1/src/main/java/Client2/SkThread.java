@@ -1,5 +1,6 @@
 package Client2;
 
+import config.AppConfig;
 import io.swagger.client.ApiClient;
 import io.swagger.client.ApiException;
 import io.swagger.client.ApiResponse;
@@ -22,17 +23,18 @@ import java.util.logging.Logger;
 public class SkThread implements Runnable {
     private static final int RETRY_TIMES = 5;
     private static final Logger LOGGER = Logger.getLogger(SkThread.class.getName());
-    private BlockingQueue<LiftRide> rideQueue;
-    private CountDownLatch curLatch;
-    private ApiClient apiClient;
-    private int numRequests;
-    private RateLimiter rateLimiter;
+    private static final RateLimiter DEFAULT_RATE_LIMITER = RateLimiter.create(AppConfig.getClient2RateLimit());
+    private static final int FAILURE_THRESHOLD = AppConfig.getClient2FailureThreshold();
+    private static final long CIRCUIT_BREAKER_TIMEOUT = AppConfig.getClient2CircuitBreakerTimeoutMs();
+    private final BlockingQueue<LiftRide> rideQueue;
+    private final CountDownLatch curLatch;
+    private final ApiClient apiClient;
+    private final int numRequests;
+    private final RateLimiter rateLimiter;
 
     // 断路器相关变量
     private static volatile boolean circuitBreakerOpen = false;
-    private static final int FAILURE_THRESHOLD = 100; // 失败次数阈值
-    private static final long CIRCUIT_BREAKER_TIMEOUT = 10000; // 断路器打开持续时间，单位毫秒
-    private static AtomicInteger consecutiveFailures = new AtomicInteger(0);
+    private static final AtomicInteger consecutiveFailures = new AtomicInteger(0);
     private static long circuitBreakerOpenedTime = 0;
 
     public SkThread(BlockingQueue<LiftRide> rideQueue, CountDownLatch curLatch, ApiClient apiClient, int numRequests, RateLimiter rateLimiter) {
@@ -40,7 +42,7 @@ public class SkThread implements Runnable {
         this.curLatch = curLatch;
         this.apiClient = apiClient;
         this.numRequests = numRequests;
-        this.rateLimiter = rateLimiter;
+        this.rateLimiter = rateLimiter != null ? rateLimiter : DEFAULT_RATE_LIMITER;
     }
 
     @Override

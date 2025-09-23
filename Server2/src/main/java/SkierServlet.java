@@ -1,6 +1,7 @@
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.rabbitmq.client.Channel;
+import config.AppConfig;
 
 import entity.LiftRide;
 import entity.ResponseMsg;
@@ -28,8 +29,7 @@ public class SkierServlet extends HttpServlet {
     private final Gson gson = new Gson();
     private ObjectPool<Channel> pool;
     private JedisPool jedisPool;
-    private final static String QUEUE_NAME = "SkierServletPostQueue";
-    private final static String DEFAULT_REDIS_URI = "redis://lqc412:Password@35.165.107.222:6379";
+    private static final String QUEUE_NAME = AppConfig.getQueueName();
 
     public void init() {
         this.pool = new GenericObjectPool<>(new ConnectionPoolFactory());
@@ -156,9 +156,7 @@ public class SkierServlet extends HttpServlet {
     }
 
     private JedisPool buildJedisPool() {
-        String redisUri = Optional.ofNullable(System.getenv("REDIS_URI"))
-                .filter(s -> !s.isEmpty())
-                .orElse(DEFAULT_REDIS_URI);
+        String redisUri = AppConfig.getRedisUri();
         try {
             return new JedisPool(new JedisPoolConfig(), new URI(redisUri));
         } catch (URISyntaxException e) {
