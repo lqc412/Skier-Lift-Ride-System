@@ -34,6 +34,11 @@ output "rabbitmq_password" {
   sensitive   = true
 }
 
+output "rabbitmq_use_ssl" {
+  description = "Whether RabbitMQ connections must use SSL/TLS."
+  value       = module.messaging.rabbitmq_requires_ssl ? "true" : "false"
+}
+
 output "redis_endpoint" {
   description = "Hostname for Redis connections."
   value       = module.messaging.redis_endpoint

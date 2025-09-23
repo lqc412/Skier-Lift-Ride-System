@@ -97,6 +97,9 @@ public class MultiThreadConsumer implements AutoCloseable {
         factory.setPort(AppConfig.getRabbitPort());
         factory.setUsername(AppConfig.getRabbitUsername());
         factory.setPassword(AppConfig.getRabbitPassword());
+        if (AppConfig.isRabbitUseSsl()) {
+            factory.useSslProtocol();
+        }
         return factory;
     }
 

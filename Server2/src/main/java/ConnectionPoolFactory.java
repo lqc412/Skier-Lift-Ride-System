@@ -13,6 +13,9 @@ public class ConnectionPoolFactory extends BasePooledObjectFactory<Channel> {
         factory.setPort(AppConfig.getRabbitPort());
         factory.setUsername(AppConfig.getRabbitUsername());
         factory.setPassword(AppConfig.getRabbitPassword());
+        if (AppConfig.isRabbitUseSsl()) {
+            factory.useSslProtocol();
+        }
 
         Connection connection = factory.newConnection();
         return connection.createChannel();

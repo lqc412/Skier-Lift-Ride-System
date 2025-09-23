@@ -71,6 +71,7 @@ module "app_server" {
     RABBITMQ_PORT            = module.messaging.rabbitmq_port
     RABBITMQ_USERNAME        = var.rabbitmq_user
     RABBITMQ_PASSWORD        = var.rabbitmq_password
+    RABBITMQ_USE_SSL         = module.messaging.rabbitmq_requires_ssl ? "true" : "false"
     REDIS_URI                = module.messaging.redis_uri
     QUEUE_NAME               = var.queue_name
     CLIENT1_BASEURL          = var.client1_baseurl
@@ -97,6 +98,7 @@ module "consumer" {
     RABBITMQ_PORT     = module.messaging.rabbitmq_port
     RABBITMQ_USERNAME = var.rabbitmq_user
     RABBITMQ_PASSWORD = var.rabbitmq_password
+    RABBITMQ_USE_SSL  = module.messaging.rabbitmq_requires_ssl ? "true" : "false"
     REDIS_URI         = module.messaging.redis_uri
     QUEUE_NAME        = var.queue_name
   }

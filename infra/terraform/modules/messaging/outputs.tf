@@ -13,6 +13,8 @@ locals {
   rabbitmq_host = coalesce(local.managed_rabbitmq_host, local.self_managed_rabbitmq_host)
   rabbitmq_port = coalesce(local.managed_rabbitmq_port, local.self_managed_rabbitmq_port, 5672)
 
+  rabbitmq_requires_ssl = local.managed_rabbitmq_amqp != null
+
   redis_host = coalesce(local.managed_redis_endpoint, local.self_managed_redis_ip)
 }
 
@@ -29,6 +31,11 @@ output "rabbitmq_host" {
 output "rabbitmq_port" {
   description = "Port exposed by RabbitMQ."
   value       = tostring(local.rabbitmq_port)
+}
+
+output "rabbitmq_requires_ssl" {
+  description = "Indicates whether clients must establish an SSL/TLS connection to RabbitMQ."
+  value       = local.rabbitmq_requires_ssl
 }
 
 output "rabbitmq_management_url" {
