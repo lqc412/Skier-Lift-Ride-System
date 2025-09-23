@@ -76,6 +76,11 @@ The following environment variables are recognized:
 For convenience a `.env.example` file shows how to configure the system for local, staging, and production environments. Copy it to `.env`, adjust the values, and export them into your shell (for example via `source .env`) before running any module. The `.env` file is ignored by Git to keep secrets out of version control.
 
 
+## Health Checks
+
+`SkierServlet` exposes a lightweight health probe at `GET /skiers/health`. The endpoint returns HTTP 200 with a minimal JSON body without reaching out to RabbitMQ or Redis, making it safe for infrastructure liveness checks even when downstream systems are degraded. When fronting the service with an AWS Application Load Balancer, configure the target group's health check to use the `/skiers/health` path so that instance registration reflects the servlet's availability rather than the state of its dependencies.
+
+
 ## Infrastructure Automation with Terraform
 
 The `infra/terraform` directory provisions the AWS foundation for the project: networking (VPC, subnets, routing, and security groups), a Tomcat Auto Scaling Group behind an Application Load Balancer, the RabbitMQ consumer Auto Scaling Group, and either managed (Amazon MQ/ElastiCache) or self-managed RabbitMQ/Redis nodes. Terraform outputs feed back into the Java components through a generated `.env` file that matches what `config.AppConfig` expects.

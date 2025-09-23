@@ -118,6 +118,20 @@ class SkierServletIntegrationIT {
     }
 
     @Test
+    void shouldReportHealthWithoutTouchingDependencies() throws IOException, InterruptedException {
+        HttpResponse<String> response = httpClient.send(
+                HttpRequest.newBuilder()
+                        .uri(buildUri("/skiers/health"))
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+
+        org.junit.jupiter.api.Assertions.assertEquals(200, response.statusCode());
+        JsonObject body = gson.fromJson(response.body(), JsonObject.class);
+        org.junit.jupiter.api.Assertions.assertEquals("UP", body.get("status").getAsString());
+    }
+
+    @Test
     void shouldPublishLiftRideAndReturnAggregates() throws IOException, InterruptedException {
         int resortId = 7;
         String seasonId = "2024";
