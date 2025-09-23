@@ -1,0 +1,13 @@
+{
+  "totalRequests": 200000,
+  "successfulRequests": 200000,
+  "failedRequests": 0,
+  "throughput": 995.49,
+  "latency": {
+    "mean": 144.85,
+    "median": 139.00,
+    "p99": 543.00,
+    "min": 9.00,
+    "max": 1261.00
+  }
+}

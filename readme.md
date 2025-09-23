@@ -24,6 +24,22 @@ This project simulates a skier lift ride system using a distributed architecture
     1. Compile and run `SkClient2`.
     2. It uses a `CachedThreadPool` to manage threads for optimal throughput.
 
+## Performance Results
+
+The latest high-throughput client run achieved **995.49 requests/second** with a **P99 latency of 543.00 ms** as captured in [`Assignment1/reports/summary.json`](Assignment1/reports/summary.json).【F:Assignment1/reports/summary.json†L1-L12】
+
+To regenerate the report against another deployment:
+
+1. Ensure the skier service is reachable and note its base URL (for example `http://localhost:8080/Server2_war`).
+2. From the repository root run:
+   ```bash
+   cd Assignment1
+   ./run_load_test.py <base-url>
+   ```
+   Replace `<base-url>` with the desired endpoint. The helper sets `CLIENT2_BASEURL`, triggers the Maven build (unless `--skip-build` is specified), executes `SkClient2`, and prints the same summary that is written to `reports/summary.json`.【F:Assignment1/run_load_test.py†L1-L73】
+
+The CSV of individual requests continues to be stored at `Assignment1/output.csv`, while the summary JSON offers a quick snapshot of totals, successes vs. failures, throughput, and latency percentiles for sharing across the team.【F:Assignment1/src/main/java/Client2/RecordProcessor.java†L16-L135】
+
 ### 3. Consumer - in `Server2`
 - **Technology**: Java, RabbitMQ
 - **Description**: The RabbitMQ consumer (`MultiThreadConsumer`) listens to the queue for incoming lift ride messages and processes them.
