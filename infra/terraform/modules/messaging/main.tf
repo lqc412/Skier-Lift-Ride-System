@@ -24,7 +24,7 @@ resource "aws_mq_broker" "rabbitmq" {
   host_instance_type   = var.rabbitmq_instance_type
   publicly_accessible  = false
   security_groups      = [var.security_group_id]
-  subnet_ids           = slice(var.private_subnet_ids, 0, length(var.private_subnet_ids))
+  subnet_ids           = [element(var.private_subnet_ids, 0)]
   deployment_mode      = "SINGLE_INSTANCE"
   auto_minor_version_upgrade = true
 
