@@ -80,12 +80,16 @@ public class SkClient2 {
 
         // Output results
         System.out.println("\nAll requests have been completed.");
-        System.out.println("Number of successful requests: " + counter.getSuccessfulPosts());
-        System.out.println("Number of failed requests: " + counter.getFailedPosts());
+        int successfulRequests = counter.getSuccessfulPosts();
+        int failedRequests = counter.getFailedPosts();
+        System.out.println("Number of successful requests: " + successfulRequests);
+        System.out.println("Number of failed requests: " + failedRequests);
 
         // Call RecordProcessor to calculate and output the results
         String outputFilePath = "./output.csv";
-        RecordProcessor recordProcessor = new RecordProcessor(outputFilePath, startTime, endTime);
+        String summaryFilePath = "./reports/summary.json";
+        RecordProcessor recordProcessor = new RecordProcessor(outputFilePath, startTime, endTime,
+                successfulRequests, failedRequests, summaryFilePath);
         recordProcessor.calculateOutput();
     }
 }
