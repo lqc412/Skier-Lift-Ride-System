@@ -179,7 +179,14 @@ public class SkierServlet extends HttpServlet {
                     seasonId = parts[0];
                     dayId = parts[1];
                 }
-                String verticalKey = "skier:" + skierId + ":day:" + dayId + ":vertical";
+
+                String verticalKey;
+                if ("TOTAL".equals(seasonId)) {
+                    verticalKey = "skier:" + skierId + ":day:" + dayId + ":vertical";
+                } else {
+                    verticalKey = "skier:" + skierId + ":season:" + seasonId + ":day:" + dayId + ":vertical";
+                }
+
                 String verticalString = jedis.get(verticalKey);
                 if (verticalString == null) {
                     continue;
@@ -203,11 +210,24 @@ public class SkierServlet extends HttpServlet {
     private SkierVertical fetchDailyVertical(int resortId, String seasonId, String dayId, String skierId) {
         int dailyVertical = 0;
         try (Jedis jedis = jedisPool.getResource()) {
-            boolean visited = jedis.sismember("resort:" + resortId + ":day:" + dayId + ":visitors", skierId);
+            String visitorsKey = "resort:" + resortId + ":season:" + seasonId + ":day:" + dayId + ":visitors";
+            boolean visited = jedis.sismember(visitorsKey, skierId);
+            if (!visited) {
+                // Fallback to legacy key without season to support existing data
+                visited = jedis.sismember("resort:" + resortId + ":day:" + dayId + ":visitors", skierId);
+            }
+
             if (!visited) {
                 return new SkierVertical(Collections.singletonList(new VerticalElement(seasonId, 0)));
             }
-            String verticalString = jedis.get("skier:" + skierId + ":day:" + dayId + ":vertical");
+
+            String verticalKey = "skier:" + skierId + ":season:" + seasonId + ":day:" + dayId + ":vertical";
+            String verticalString = jedis.get(verticalKey);
+            if (verticalString == null) {
+                // Fallback to legacy key without season for existing data
+                verticalString = jedis.get("skier:" + skierId + ":day:" + dayId + ":vertical");
+            }
+
             if (verticalString != null) {
                 dailyVertical = Integer.parseInt(verticalString);
             }

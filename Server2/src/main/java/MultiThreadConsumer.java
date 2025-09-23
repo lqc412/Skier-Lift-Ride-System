@@ -78,18 +78,20 @@ public class MultiThreadConsumer {
                             // Retrieve skierID, day, liftID from the message
                             Integer skierID = jsonObject.get("skierID").getAsInt();
                             String day = jsonObject.get("day").getAsString();
+                            String season = jsonObject.get("seasonID").getAsString();
                             int liftID = jsonObject.get("liftID").getAsInt();
                             int vertical = liftID * 10;
 
                             // Design of keys in Redis
                             String skierDaysKey = "skier:" + skierID + ":days";
-                            String skierVerticalKey = "skier:" + skierID + ":day:" + day + ":vertical";
-                            String skierLiftsKey = "skier:" + skierID + ":day:" + day + ":lifts";
-                            String resortVisitorsKey = "resort:" + jsonObject.get("resortID").getAsString() + ":day:" + day + ":visitors";
+                            String skierSeasonDayMember = season + "|" + day;
+                            String skierVerticalKey = "skier:" + skierID + ":season:" + season + ":day:" + day + ":vertical";
+                            String skierLiftsKey = "skier:" + skierID + ":season:" + season + ":day:" + day + ":lifts";
+                            String resortVisitorsKey = "resort:" + jsonObject.get("resortID").getAsString() + ":season:" + season + ":day:" + day + ":visitors";
 
                             // Use Pipeline to improve Redis operation performance
                             Pipeline pipeline = jedis.pipelined();
-                            pipeline.sadd(skierDaysKey, day); // Record the days the skier has skied
+                            pipeline.sadd(skierDaysKey, skierSeasonDayMember); // Record the days the skier has skied
                             pipeline.incrBy(skierVerticalKey, vertical); // Update the total vertical for each day
                             pipeline.rpush(skierLiftsKey, String.valueOf(liftID)); // Record the lifts the skier has taken each day
                             pipeline.sadd(resortVisitorsKey, String.valueOf(skierID)); // Record skiers who visited a resort
