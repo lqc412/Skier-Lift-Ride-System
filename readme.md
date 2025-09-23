@@ -76,6 +76,62 @@ The following environment variables are recognized:
 For convenience a `.env.example` file shows how to configure the system for local, staging, and production environments. Copy it to `.env`, adjust the values, and export them into your shell (for example via `source .env`) before running any module. The `.env` file is ignored by Git to keep secrets out of version control.
 
 
+## Infrastructure Automation with Terraform
+
+The `infra/terraform` directory provisions the AWS foundation for the project: networking (VPC, subnets, routing, and security groups), a Tomcat Auto Scaling Group behind an Application Load Balancer, the RabbitMQ consumer Auto Scaling Group, and either managed (Amazon MQ/ElastiCache) or self-managed RabbitMQ/Redis nodes. Terraform outputs feed back into the Java components through a generated `.env` file that matches what `config.AppConfig` expects.
+
+### Prerequisites
+
+- [Terraform](https://www.terraform.io/downloads.html) 1.4 or newer
+- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) with credentials able to create VPC, EC2, Amazon MQ, and Amazon ElastiCache resources
+- An S3 bucket (and optional DynamoDB table) if you plan to store Terraform state remotely
+- `jq` for transforming Terraform outputs into environment variables
+
+Terraform stores state locally by default (`infra/terraform/terraform.tfstate`). In shared environments configure a remote backend by adding a `backend "s3" { ... }` stanza to the `terraform` block in `infra/terraform/main.tf` that points at your S3 bucket and DynamoDB lock table.
+
+### Sample `terraform.tfvars`
+
+```
+aws_region              = "us-west-2"
+environment             = "staging"
+app_artifact_url        = "https://artifacts.example.com/skier-server/latest/Server.war"
+consumer_artifact_url   = "https://artifacts.example.com/skier-consumer/latest/Consumer.jar"
+rabbitmq_password       = "change-me"
+rabbitmq_mode           = "managed"         # or "self_managed"
+redis_mode              = "managed"          # or "self_managed"
+client1_baseurl         = "https://skier-api.example.com/Server_war_exploded"
+client2_baseurl         = "https://skier-api.example.com/Server2_war"
+tags = {
+  Owner = "your-team"
+}
+```
+
+Add optional overrides for subnet CIDRs, scaling targets, or instance sizes using the variables declared in `infra/terraform/variables.tf`.
+
+### Provisioning Workflow
+
+```
+cd infra/terraform
+terraform init
+terraform plan -var-file=terraform.tfvars
+terraform apply -var-file=terraform.tfvars
+```
+
+When the apply completes, convert the Terraform outputs into a `.env` file:
+
+```
+./render-env.sh ../../.env.generated
+```
+
+Source the generated file before running the servlet, consumer, or load-test clients (`source .env.generated`). The helper includes the ALB endpoint, RabbitMQ/Redis coordinates, queue name, and client base URLs consumed by `config.AppConfig`.
+
+To tear everything down:
+
+```
+terraform destroy -var-file=terraform.tfvars
+```
+
+
 ## System Requirements
 
 - **Java**: JDK 8 or higher.
