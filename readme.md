@@ -26,29 +26,20 @@ This project simulates a skier lift ride system using a distributed architecture
 
 ## Performance Results
 
-The latest high-throughput client run achieved **995.49 requests/second** with a **P99 latency of 543.00 ms** as captured in [`Assignment1/reports/summary.json`](Assignment1/reports/summary.json).【F:Assignment1/reports/summary.json†L1-L12】
+Load-tested with a custom multithreaded Java client generating **200,000 lift-ride
+events** (Phase 1: 32 threads, Phase 2: 168 threads). Throughput scales with the
+number of load-balanced server instances behind the AWS ALB:
 
-To regenerate the report against another deployment:
+| Configuration   | Throughput     | Mean   | Median | P99    | Failed / Total |
+| --------------- | -------------- | ------ | ------ | ------ | -------------- |
+| Single instance | 1,223 req/s    | 114 ms | 119 ms | 308 ms | 0 / 200,000    |
+| Two instances   | 2,113 req/s    | 59 ms  | 48 ms  | 169 ms | 0 / 200,000    |
+| Four instances  | **2,966 req/s**| 36 ms  | 33 ms  | **88 ms** | **0 / 200,000** |
 
-1. Ensure the skier service is reachable and note its base URL (for example `http://localhost:8080/Server2_war`).
-2. From the repository root run:
-   ```bash
-   cd Assignment1
-   ./run_load_test.py <base-url>
-   ```
-   Replace `<base-url>` with the desired endpoint. The helper sets `CLIENT2_BASEURL`, triggers the Maven build (unless `--skip-build` is specified), executes `SkClient2`, and prints the same summary that is written to `reports/summary.json`.【F:Assignment1/run_load_test.py†L1-L73】
-
-The CSV of individual requests continues to be stored at `Assignment1/output.csv`, while the summary JSON offers a quick snapshot of totals, successes vs. failures, throughput, and latency percentiles for sharing across the team.【F:Assignment1/src/main/java/Client2/RecordProcessor.java†L16-L135】
-
-### 3. Consumer - in `Server2`
-- **Technology**: Java, RabbitMQ
-- **Description**: The RabbitMQ consumer (`MultiThreadConsumer`) listens to the queue for incoming lift ride messages and processes them.
-- **Main Features**:
-    - Uses multiple threads to consume messages.
-    - Stores the processed data in Redis, recording per-day totals, visited days, and resort visitors.
-- **How to Run**:
-    1. Ensure RabbitMQ is installed and configured correctly.
-    2. Run `MultiThreadConsumer` to start consuming messages from the queue.
+Horizontal scaling via load balancing improved overall throughput ~2.4x
+(1.2K → ~3K req/s) while cutting tail latency (P99 308ms → 88ms) and sustaining
+a 0% error rate across all configurations. Full run logs and RabbitMQ dashboards
+are in [`Assignment2Submission.pdf`](./Assignment2Submission.pdf).
 
 ## Setup Instructions
 
